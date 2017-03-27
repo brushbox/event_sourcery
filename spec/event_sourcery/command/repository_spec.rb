@@ -6,7 +6,7 @@ RSpec.describe EventSourcery::Command::Repository do
     Class.new do
       include EventSourcery::Command::AggregateRoot
 
-      apply ItemAdded do |event|
+      def apply_item_added(event)
         @item_added_events ||= []
         @item_added_events << event
       end
