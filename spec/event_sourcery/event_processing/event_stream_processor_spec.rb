@@ -11,10 +11,6 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
         @events = []
       end
 
-      def process(event)
-        @events << event
-      end
-
       class_eval(&block) if block_given?
     end.new(tracker: tracker)
   end
@@ -48,7 +44,8 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
   describe '#processes?' do
     it 'returns true for events the processor is interested in' do
       event_processor = new_event_processor do
-        processes_events :item_added, :item_removed
+        process ItemAdded, ItemRemoved do
+        end
       end
       expect(event_processor.processes?(:item_added)).to eq true
       expect(event_processor.processes?('item_added')).to eq true
@@ -60,32 +57,40 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
   end
 
   describe '#reset' do
+    let(:event_store) { double(:event_store) }
     subject(:event_processor) {
       new_event_processor do
         processor_name 'my_processor'
-        processes_all_events
+
+        process do |event|
+        end
       end
     }
 
     before do
-      event_processor.setup
-      event_processor.process(new_event(id: 1))
+      allow(event_store).to receive(:subscribe).and_yield([ItemAdded.new(id: 1)]).once
+      event_processor.subscribe_to(event_store)
     end
 
     it 'resets last processed event ID' do
-      event_processor.reset
-      expect(tracker.last_processed_event_id(:test_processor)).to eq 0
+      expect {
+        event_processor.reset
+      }.to change {
+        tracker.last_processed_event_id('my_processor')
+      }.from(1).to(0)
     end
   end
 
   describe '#subscribe_to' do
     let(:event_store) { double(:event_store) }
-    let(:events) { [new_event(id: 1), new_event(id: 2)] }
+    let(:events) { [ItemAdded.new(id: 1), ItemAdded.new(id: 2)] }
     let(:subscription_master) { spy(EventSourcery::EventStore::SignalHandlingSubscriptionMaster) }
     subject(:event_processor) {
       new_event_processor do
         processor_name 'my_processor'
-        processes_all_events
+        process do |event|
+          @events << event
+        end
       end
     }
 
@@ -110,7 +115,9 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
       subject(:event_processor) {
         new_event_processor do
           processor_name 'my_processor'
-          processes_events :item_added
+          process ItemAdded do |event|
+            @events << event
+          end
         end
       }
 
@@ -148,15 +155,14 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
           include EventSourcery::EventProcessing::EventStreamProcessor
           attr_reader :events
           processor_name 'my_processor'
-          processes_events :item_added
 
-          attr_reader :internal_event_ref
-
-          def process(event)
+          process ItemAdded do |event|
             @internal_event_ref = _event.dup
             @events ||= []
             @events << event
           end
+
+          attr_reader :internal_event_ref
         end.new(tracker: tracker)
       }
 
@@ -170,7 +176,7 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
       end
 
       context 'given an event the processor cares about' do
-        let(:event) { new_event(type: 'item_added') }
+        let(:event) { ItemAdded.new }
 
         it 'processes them' do
           event_processor.process(event)

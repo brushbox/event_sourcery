@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - The `processing_event` method from the memory tracker. It was intended to
   be a mechanism to wrap processing and tracker updates which appears to be
   universally unused at this point.
+- Remove `processes_events` in favour of `process` class method. You can no
+  longer override `process` and subscribe to all events.
+  If you want to subscribe to all events you can call the `process` class
+  method with no events.
+
+      process do |event|
+        # all events will be subscribed to
+      end
 
 ## [0.12.0] - 2017-6-1
 ### Removed

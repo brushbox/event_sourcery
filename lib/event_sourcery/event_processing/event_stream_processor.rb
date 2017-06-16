@@ -8,6 +8,7 @@ module EventSourcery
         EventSourcery.event_stream_processor_registry.register(base)
         base.class_eval do
           @event_handlers = Hash.new { |hash, key| hash[key] = [] }
+          @all_event_handler = nil
         end
       end
 
@@ -20,17 +21,8 @@ module EventSourcery
       module ProcessHandler
         def process(event)
           @_event = event
-          handlers = self.class.event_handlers[event.type]
-          if handlers.any?
-            handlers.each do |handler|
-              instance_exec(event, &handler)
-            end
-          elsif self.class.processes?(event.type)
-            if defined?(super)
-              super(event)
-            else
-              raise UnableToProcessEventError, "I don't know how to process '#{event.type}' events."
-            end
+          (self.class.event_handlers[event.type] + [self.class.all_event_handler]).compact.each do |handler|
+            instance_exec(event, &handler)
           end
           @_event = nil
         rescue
@@ -39,17 +31,7 @@ module EventSourcery
       end
 
       module ClassMethods
-        attr_reader :processes_event_types, :event_handlers
-
-        def processes_events(*event_types)
-          @processes_event_types = Array(@processes_event_types) | event_types.map(&:to_s)
-        end
-
-        def processes_all_events
-          define_singleton_method :processes? do |_|
-            true
-          end
-        end
+        attr_reader :processes_event_types, :event_handlers, :all_event_handler
 
         def processes?(event_type)
           processes_event_types &&
@@ -65,9 +47,13 @@ module EventSourcery
         end
 
         def process(*event_classes, &block)
-          event_classes.each do |event_class|
-            processes_events event_class.type
-            @event_handlers[event_class.type] << block
+          if event_classes.empty?
+            @all_event_handler = block
+          else
+            event_classes.each do |event_class|
+              @processes_event_types = Array(@processes_event_types) | [event_class.type]
+              @event_handlers[event_class.type] << block
+            end
           end
         end
       end
