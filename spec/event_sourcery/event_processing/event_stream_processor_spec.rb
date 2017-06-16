@@ -266,5 +266,23 @@ RSpec.describe EventSourcery::EventProcessing::EventStreamProcessor do
         end
       end
     end
+
+    context 'when attempting to add multiple generic handlers' do
+      let(:event_processor) do
+        Class.new do
+          include EventSourcery::EventProcessing::EventStreamProcessor
+
+          process do
+          end
+
+          process do
+          end
+        end.new
+      end
+
+      it 'raises an error' do
+        expect { event_processor }.to raise_error EventSourcery::MultipleCatchAllHandelersDefined, 'Attemping to define multiple catch all event handlers.'
+      end
+    end
   end
 end
