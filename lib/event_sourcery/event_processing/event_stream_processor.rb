@@ -40,7 +40,7 @@ module EventSourcery
           end
           @_event = nil
         rescue
-          raise EventProcessingError.new(event)
+          raise EventProcessingError.new(event), "Processor: #{processor_name.to_s}\nEvent: #{event.inspect}"
         end
       end
 
